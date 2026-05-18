@@ -1,0 +1,15 @@
+[package]
+name = "bbs_zpk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+base64 = "0.22.1"
+bbs = "0.4.1"
+sha3 = { version = "0.12.0", features = ["zeroize"] }
+thiserror = "2.0.18"
+
+[dev-dependencies]
+mockall = "0.14.0"
+
