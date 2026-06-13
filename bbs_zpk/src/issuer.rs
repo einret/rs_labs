@@ -1,11 +1,15 @@
 use crate::error::{AppError, Result};
 use crate::traits::{FullExtractor, Signer};
 use bbs::prelude::*;
+use zeroize::Zeroize;
 
 const DEFAULT_MESSAGE_COUNT: usize = 5;
 
+#[derive(Zeroize)]
+#[zeroize(drop)]
 pub(crate) struct MyIssuer {
     sk: SecretKey,
+    #[zeroize(skip)]
     pk: PublicKey,
     messages_len: usize,
 }
