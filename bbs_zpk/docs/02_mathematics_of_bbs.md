@@ -90,7 +90,7 @@ To set up the system to sign $L$ messages (in our code, `DEFAULT_MESSAGE_COUNT =
 let (pk, sk) = Issuer::new_keys(n)?; 
 ```
 
-## 3. Signing Messages (`Signer::sign`)
+## 3. Signing Messages (`MyIssuer::sign_identity`)
 
 When Alice wants the Issuer to sign her identity (e.g., Name, IsMajor, Address), the fields are first hashed into numerical scalar values: $m_1, m_2, m_3$.
 
@@ -113,7 +113,7 @@ We will see exactly how a Verifier can validate this fraction equation in Step 5
 *Code Mapping:* In `issuer.rs`, this mathematical exponentiation to compute $(A, e, s)$ is handled internally by the `Signature::new` function:
 ```rust
 let messages_to_sign: Vec<SignatureMessage> =
-    messages.iter().map(|m| SignatureMessage::hash(m)).collect();
+    messages.iter().map(SignatureMessage::hash).collect();
 
 // This computes the signature tuple (A, e, s) and compresses it into 112 bytes
 let signature = Signature::new(messages_to_sign.as_slice(), &self.sk, &self.pk)?;
@@ -227,16 +227,16 @@ $$ e(A, g_2)^{r_1 \cdot x} = e(A, g_2)^{r_1 \cdot x} $$
 *Code Mapping:* In `main.rs`, this verification and pairing math is executed with:
 ```rust
 // Performs the cryptographic pairing check and extracts the validated disclosures
-let verifier = Verifier::verify_signature_pok(
+let revealed_messages = Verifier::verify_signature_pok(
     &proof.proof_request, 
     &proof.signature, 
-    &proof.nonce
-).map_err(|e| e.to_string());
+    &proof.nonce,
+)?;
 ```
 
 This prints the following output when executed, proving everything is mathematically and functionally sound:
 ```text
-Identity: Identity { name: "Alice", is_major: true, address: "42-4567 crypto world", signature: "kbXeXSjmlxuU8iR28SEuSMhd6S0/3LD6RM1FbRBPB1OnENEF85VGrWTiS1YC5g+mUJyxeG4Dt51RhKBMH3vZbIng7Ygch0tVsZXe111YwG5gQMEbTLsL9PdPptrfqjVjSlqbwIHCrI9QtfrGm+U/xw==" }
+Identity: Identity { body: IdentityBody { name: "Alice", is_major: true, address: "42-4567 crypto world" }, signature: "..." }
 
 Is Alice a major?
 lets verify the proof and signature
