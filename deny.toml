@@ -1,0 +1,41 @@
+[advisories]
+version = 2
+db-urls = ["https://github.com/rustsec/advisory-db"]
+
+# Accepted advisories, each with a reason and (ideally) an expiry note
+# in a comment so a future reviewer knows to revisit.
+ignore = [
+    # bbs 0.4.1 depends on failure 0.1.8, which is unmaintained.
+    # Not vulnerable — no known exploit — but no longer updated.
+    # Acceptable for an educational project
+    "RUSTSEC-2020-0036",
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "BSD-2-Clause",
+]
+confidence-threshold = 0.9
+
+[bans]
+# Educational project - okayish
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+
+skip = [
+    { name = "syn"},
+    { name = "rand_core"},
+    { name = "rand"}
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

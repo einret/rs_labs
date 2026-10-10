@@ -1,9 +1,8 @@
-use crate::error::{AppError, Result};
-use crate::traits::{FullExtractor, Signer};
+use crate::error::{AppError, CompressedSignature, Result};
+use crate::identity::{Identity, IdentityBody};
+use crate::traits::FullExtractor;
 use bbs::prelude::*;
 use zeroize::Zeroize;
-
-const DEFAULT_MESSAGE_COUNT: usize = 5;
 
 #[derive(Zeroize)]
 #[zeroize(drop)]
@@ -11,50 +10,66 @@ pub(crate) struct MyIssuer {
     sk: SecretKey,
     #[zeroize(skip)]
     pk: PublicKey,
-    messages_len: usize,
 }
 
 impl MyIssuer {
     pub(crate) fn new(n: usize) -> Result<Self> {
         let (pk, sk) = Issuer::new_keys(n)?;
-        Ok(Self {
-            sk,
-            pk,
-            messages_len: n,
-        })
+        Ok(Self { sk, pk })
     }
-}
 
-impl Signer for MyIssuer {
-    fn public_key(&self) -> &PublicKey {
+    #[allow(dead_code)]
+    pub(crate) fn public_key(&self) -> &PublicKey {
         &self.pk
     }
-    fn sign(&self, entity: &dyn FullExtractor) -> Result<[u8; 112]> {
+
+    fn sign(&self, entity: &dyn FullExtractor) -> Result<CompressedSignature> {
         let messages = entity.get_all_fields();
-        if messages.len() != self.messages_len {
+        let expected_count = self.pk.message_count();
+        if messages.len() != expected_count {
             return Err(AppError::SigningError {
                 entity_description: "generic entity".to_string(),
-                reason: "Invalid message count".to_string(),
+                reason: format!(
+                    "expected {} messages, got {}",
+                    expected_count,
+                    messages.len()
+                ),
                 inner: None,
             });
         }
         let messages_to_sign: Vec<SignatureMessage> =
-            messages.iter().map(|m| SignatureMessage::hash(m)).collect();
+            messages.iter().map(SignatureMessage::hash).collect();
 
-        let signature = Signature::new(messages_to_sign.as_slice(), &self.sk, &self.pk)?;
+        let signature =
+            Signature::new(messages_to_sign.as_slice(), &self.sk, &self.pk).map_err(|err| {
+                AppError::SigningError {
+                    entity_description: "generic entity".to_string(),
+                    reason: "failed to compute BBS+ signature".to_string(),
+                    inner: Some(err),
+                }
+            })?;
 
         Ok(signature.to_bytes_compressed_form())
     }
+    pub(crate) fn sign_identity(&self, body: &IdentityBody) -> Result<crate::identity::Identity> {
+        let signature = self.sign(body)?;
+        Ok(Identity::new(body.clone(), signature, self.pk.clone()))
+    }
 }
 
-impl Default for MyIssuer {
-    fn default() -> Self {
-        let (pk, sk) = Issuer::new_keys(DEFAULT_MESSAGE_COUNT)
-            .expect("Échec critique de l'initialisation par défaut de MyIssuer");
-        Self {
-            sk,
-            pk,
-            messages_len: DEFAULT_MESSAGE_COUNT,
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_issuer_rejects_mismatched_message_count() {
+        let issuer = MyIssuer::new(5).unwrap(); // expects 5
+        let body = IdentityBody {
+            name: "Dave".to_string(),
+            is_major: false,
+            address: "Nowhere".to_string(),
+        };
+        let res = issuer.sign_identity(&body);
+        assert!(res.is_err());
     }
 }
