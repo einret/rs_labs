@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs: 
+  changed:
+    runs-on: ubuntu-latest
+    outputs:
+      dirs: ${{ steps.list.outputs.dirs }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+        with:
+          fetch-depth: 0
+      - id: list
+        run: |
+          BASE="origin/main"
+          DIRS=$(git diff --name-only "$BASE"...HEAD \
+            | awk -F/ 'NF>1 {print $1}' \
+            | sort -u \
+            | while read -r d; do [ -f "$d/Cargo.toml" ] && echo "$d"; done \
+            | jq -Rsc 'split("\n") | map(select(length > 0))')
+          echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: changed
+    if: needs.changed.outputs.dirs != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.changed.outputs.dirs) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+      - name: Load tooling versions
+        run: sed 's/[[:space:]]*#.*//' .github/tooling.env >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f #v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 #v2.9.2
+        with:
+          workspaces: ${{ matrix.dir }}
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe #v2.87.27
+        with:
+          tool: |
+            cargo-nextest@${{ env.NEXTEST_VERSION }}
+            cargo-machete@${{ env.MACHETE_VERSION }}
+          
+
+      - run: cargo fmt --check
+        working-directory: ${{ matrix.dir }}
+
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: ${{ matrix.dir }}
+
+      - run: cargo nextest run --all-features
+        working-directory: ${{ matrix.dir }}
+
+      - run: cargo machete
+        working-directory: ${{ matrix.dir }}
+
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 #v2.1.1
+        with:
+          command: check advisories bans licenses sources
