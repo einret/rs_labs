@@ -2,4 +2,8 @@
 resolver = "3"
 members = [
     "bbs_zpk",
+    "rekor_leak"
 ]
+
+[workspace.package]
+rust-version = "1.99.0"
