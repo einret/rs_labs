@@ -1,0 +1,18 @@
+[package]
+name = "rekor_leak"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+rust-version.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+clap = { version = "4.5", features = ["derive"] }
+futures = "0.3"
+reqwest = { version = "0.13.5", features = ["json"] }
+serde_json = "1.0.154"
+sigstore-rekor = "0.14.0"
+sigstore-types = "0.14.0"
+thiserror = "2.0.21"
+tokio = { version = "1.53.2", features = ["full"] }
+x509-parser = "0.18.1"
